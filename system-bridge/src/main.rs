@@ -1,8 +1,12 @@
 use tokio_cron_scheduler::{Job, JobScheduler};
 use zbus::{connection, interface};
 
+mod audio_manager;
 mod bluetooth_agent;
+mod system_manager;
 mod wifi_manager;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// The IPC Bridge that will be exposed over D-Bus for the Tauri Shell
 struct VibeSystemBridge;
@@ -37,21 +41,40 @@ impl VibeSystemBridge {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting VibeCast System Bridge Daemon...");
 
+    let setup_mode = Arc::new(AtomicBool::new(false));
+
     // 1. Networking: nmrs Wi-Fi Manager and Hotspot fallback
-    tokio::spawn(async {
-        if let Err(e) = wifi_manager::start_wifi_manager().await {
+    let sm_wifi = setup_mode.clone();
+    tokio::spawn(async move {
+        if let Err(e) = wifi_manager::start_wifi_manager(sm_wifi).await {
             eprintln!("Wifi Manager Error: {}", e);
         }
     });
 
     // 2. Bluetooth: Auto-connect to last used speaker via bluer
-    tokio::spawn(async {
-        if let Err(e) = bluetooth_agent::start_bluetooth_agent().await {
+    let sm_bt = setup_mode.clone();
+    tokio::spawn(async move {
+        if let Err(e) = bluetooth_agent::start_bluetooth_agent(sm_bt).await {
             eprintln!("Bluetooth Agent Error: {}", e);
         }
     });
 
-    // 3. Arch Maintenance: Schedule weekly auto-update (Sunday at 3 AM)
+    // 3. System Manager: WebSockets config
+    let sm_sys = setup_mode.clone();
+    tokio::spawn(async move {
+        if let Err(e) = system_manager::start_system_manager(sm_sys).await {
+            eprintln!("System Manager Server Error: {}", e);
+        }
+    });
+
+    // 4. Audio Manager: PipeWire `pactl subscribe` Listener
+    tokio::spawn(async move {
+        if let Err(e) = audio_manager::start_audio_manager().await {
+            eprintln!("Audio Manager Error: {}", e);
+        }
+    });
+
+    // 5. Arch Maintenance: Schedule weekly auto-update (Sunday at 3 AM)
     let sched = JobScheduler::new().await?;
     sched
         .add(Job::new_async("0 0 3 * * Sun", |_uuid, _l| {

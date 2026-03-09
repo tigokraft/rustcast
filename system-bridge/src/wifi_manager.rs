@@ -1,6 +1,8 @@
 use axum::{routing::post, Json, Router};
 use serde::Deserialize;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -10,11 +12,12 @@ pub struct WifiConfig {
     pub password: String,
 }
 
-pub async fn start_wifi_manager() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn start_wifi_manager(setup_mode: Arc<AtomicBool>) -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing WifiManager with nmrs...");
 
     // 1. Networking (nmrs + Hotspot Timeout)
-    tokio::spawn(async {
+    let sm_clone = setup_mode.clone();
+    tokio::spawn(async move {
         // Scan for known SSID connections on startup
         println!("Scanning for saved connections...");
 
@@ -32,6 +35,8 @@ pub async fn start_wifi_manager() -> Result<(), Box<dyn std::error::Error>> {
         if !is_connected {
             println!("No connection active within 30 seconds.");
             println!("Using nmrs to create Wi-Fi Hotspot 'VibeCast-Setup'...");
+            println!("Entering Setup Mode...");
+            sm_clone.store(true, Ordering::Relaxed);
             // nmrs hotspot creation logic goes here
             is_connected = true; // Pretend hotspot is up
         } else {
@@ -40,8 +45,11 @@ pub async fn start_wifi_manager() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // 2. Axum Server for `/api/connect`
-    tokio::spawn(async {
-        let app = Router::new().route("/api/connect", post(handle_wifi_connect));
+    let sm_route = setup_mode.clone();
+    tokio::spawn(async move {
+        let app = Router::new()
+            .route("/api/connect", post(handle_wifi_connect))
+            .with_state(sm_route);
         
         // Listen on the Hotspot IP address
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 125, 1)), 8000);
@@ -66,11 +74,17 @@ pub async fn start_wifi_manager() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn handle_wifi_connect(Json(payload): Json<WifiConfig>) -> axum::http::StatusCode {
+async fn handle_wifi_connect(
+    axum::extract::State(setup_mode): axum::extract::State<Arc<AtomicBool>>,
+    Json(payload): Json<WifiConfig>
+) -> axum::http::StatusCode {
     println!("Axum /api/connect hit! SSID: {}", payload.ssid);
     println!("Saving NetworkManager profile for '{}' using nmrs...", payload.ssid);
     println!("Disabling 'VibeCast-Setup' Hotspot using nmrs...");
     println!("Connecting to new Wi-Fi network '{}'...", payload.ssid);
+    
+    // Disable setup mode
+    setup_mode.store(false, Ordering::Relaxed);
     
     // Example nmrs usage logic:
     // let nm = nmrs::NetworkManager::new().await.unwrap();

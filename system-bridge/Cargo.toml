@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 arch-toolkit = "0.2.0"
-axum = "0.8.8"
+axum = { version = "0.8.8", features = ["ws"] }
 bluer = { version = "0.17.4", features = ["full"] }
 futures-util = "0.3.32"
 nmrs = "2.0.1"

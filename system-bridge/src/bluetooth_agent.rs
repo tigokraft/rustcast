@@ -3,6 +3,8 @@ use bluer::{Address, Session};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 use tokio_stream::StreamExt;
@@ -12,9 +14,21 @@ pub struct BtConfig {
     pub last_used_speaker: Option<Address>,
 }
 
-pub async fn start_bluetooth_agent() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn start_bluetooth_agent(setup_mode: Arc<AtomicBool>) -> Result<(), Box<dyn std::error::Error>> {
     let session = Session::new().await?;
-    let _adapter = session.default_adapter().await?;
+    let adapter = session.default_adapter().await?;
+
+    // Continuously monitor Setup Mode and toggle discoverability
+    let setup_adapter = session.default_adapter().await?;
+    let sm_clone = setup_mode.clone();
+    tokio::spawn(async move {
+        loop {
+            let is_setup = sm_clone.load(Ordering::Relaxed);
+            let _ = setup_adapter.set_discoverable(is_setup).await;
+            let _ = setup_adapter.set_pairable(is_setup).await;
+            sleep(Duration::from_secs(2)).await;
+        }
+    });
 
     // Register a pairing agent that allows any device to pair without a PIN
     let agent = Agent {
@@ -120,18 +134,11 @@ fn spawn_device_listener(device: bluer::Device) {
             while let Some(evt) = device_events.next().await {
                 if let bluer::DeviceEvent::PropertyChanged(bluer::DeviceProperty::Connected(true)) = evt {
                     println!("Bluetooth Audio Device connected: {}", device.address());
-                    // Auto-switch PipeWire sink
-                    println!("Switching PipeWire default sink to Bluetooth output...");
-                    // Give pipewire/wireplumber a brief moment to register the new bluez node
-                    sleep(Duration::from_secs(2)).await;
-                    
-                    // In a production environment, we'd use wpctl status to find the exact node ID of the Bluetooth sink
-                    // For this environment demo as designated by arch architecture, we can call wpctl to set default 50
-                    // Or more dynamically: wpctl set-default $(wpctl status | grep -i bluez | head -n1 | grep -o '[0-9]\+')
-                    let _ = tokio::process::Command::new("sh")
-                        .arg("-c")
-                        .arg("wpctl set-default $(wpctl status | grep -i bluez | grep Sink | head -n1 | grep -o '[0-9]\\+')")
-                        .spawn();
+                    // Auto-trust device upon successful connection
+                    if let Ok(false) = device.is_trusted().await {
+                        println!("Auto-trusting connected device: {}", device.address());
+                        let _ = device.set_trusted(true).await;
+                    }
                 }
             }
         }
