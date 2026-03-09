@@ -64,31 +64,34 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     // Handle User Input mapping globally on the entire focus layer
     window.addEventListener("keydown", async (e) => {
-        const remoteInput = KEY_MAP[e.key];
-        if (remoteInput) {
+        const action = KEY_MAP[e.key];
+        if (action) {
             e.preventDefault();
-            // Send focus input straight to rust backend, replacing UI locally
-            const nextUiState = await invoke("send_remote_input", { input: remoteInput });
-            // Since we use a mock state tree of `{"type": "container", "children": []}` from the Rust wrapper,
-            // we will pretty print the JSON into the container
-            try {
-                const parsed = JSON.parse(nextUiState);
-                appContainer.innerHTML = `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
-            } catch {
-                appContainer.innerHTML = `<pre>${nextUiState}</pre>`;
-            }
+            // Wrap in quote string format to match Serde enum variant representation
+            const payload = JSON.stringify(action);
+            const nextUiState = await invoke("send_remote_input", { input: payload });
+            try { appContainer.innerHTML = `<pre>${JSON.stringify(JSON.parse(nextUiState), null, 2)}</pre>`; } catch { appContainer.innerHTML = `<pre>${nextUiState}</pre>`; }
         }
     });
+
+    // Establish WebSocket Connection to local remote-server
+    function connectRemoteServer() {
+        const ws = new WebSocket("ws://127.0.0.1:8002/ws/remote");
+        ws.onmessage = async (event) => {
+            // The message from WS is already a serialized `RemoteInput` JSON string
+            const nextUiState = await invoke("send_remote_input", { input: event.data });
+            try { appContainer.innerHTML = `<pre>${JSON.stringify(JSON.parse(nextUiState), null, 2)}</pre>`; } catch { appContainer.innerHTML = `<pre>${nextUiState}</pre>`; }
+        };
+        ws.onerror = () => setTimeout(connectRemoteServer, 5000);
+    }
+    connectRemoteServer();
 
     // Request an initial render of whatever app was automatically loaded
     try {
         const activeName = await invoke("get_active_app", {});
         if (activeName) {
-            // Send an empty input just to yield the render state for now, 
-            // since we don't have a direct `render_active()` exposed easily yet.
-            const uiState = await invoke("send_remote_input", { input: "None" });
-            const parsed = JSON.parse(uiState);
-            appContainer.innerHTML = `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
+            const nextUiState = await invoke("send_remote_input", { input: "\"Select\"" }); // Mock input
+            try { appContainer.innerHTML = `<pre>${JSON.stringify(JSON.parse(nextUiState), null, 2)}</pre>`; } catch { appContainer.innerHTML = `<pre>${nextUiState}</pre>`; }
         }
     } catch {}
 });

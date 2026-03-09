@@ -43,17 +43,11 @@ fn set_active_app(state: tauri::State<Arc<Mutex<Registry>>>, app_id: String) -> 
 #[tauri::command]
 fn send_remote_input(state: tauri::State<Arc<Mutex<Registry>>>, input: String) -> String {
     let mut registry = state.lock().unwrap();
-    let remote_input = match input.as_str() {
-        "Up" => RemoteInput::Up,
-        "Down" => RemoteInput::Down,
-        "Left" => RemoteInput::Left,
-        "Right" => RemoteInput::Right,
-        "Select" => RemoteInput::Select,
-        "Back" => RemoteInput::Back,
-        "PlayPause" => RemoteInput::PlayPause,
-        "VolumeUp" => RemoteInput::VolumeUp,
-        "VolumeDown" => RemoteInput::VolumeDown,
-        _ => return "{\"type\": \"container\", \"children\": []}".to_string(),
+
+    // The frontend passes serialized `RemoteInput` from the WebSockets
+    let remote_input = match serde_json::from_str::<RemoteInput>(&input) {
+        Ok(r) => r,
+        Err(_) => return "{\"type\": \"error\", \"message\": \"invalid input\"}".to_string(),
     };
 
     if let Some(app) = registry.active_app_mut() {
