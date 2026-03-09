@@ -7,9 +7,11 @@ edition = "2024"
 arch-toolkit = "0.2.0"
 axum = "0.8.8"
 bluer = { version = "0.17.4", features = ["full"] }
+futures-util = "0.3.32"
 nmrs = "2.0.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 tokio = { version = "1.50.0", features = ["macros", "process", "rt-multi-thread", "time"] }
 tokio-cron-scheduler = "0.15.1"
+tokio-stream = "0.1.18"
 zbus = "5.14.0"

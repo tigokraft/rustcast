@@ -1,12 +1,8 @@
-
-use axum::{routing::post, Json, Router};
-use serde::Deserialize;
-mod bluetooth_agent;
-use std::net::SocketAddr;
-use std::time::Duration;
-use tokio::time::sleep;
 use tokio_cron_scheduler::{Job, JobScheduler};
 use zbus::{connection, interface};
+
+mod bluetooth_agent;
+mod wifi_manager;
 
 /// The IPC Bridge that will be exposed over D-Bus for the Tauri Shell
 struct VibeSystemBridge;
@@ -37,52 +33,15 @@ impl VibeSystemBridge {
     }
 }
 
-#[derive(Deserialize)]
-struct WifiConfig {
-    ssid: String,
-    password: String,
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting VibeCast System Bridge Daemon...");
 
-    // 1. Networking (nmrs + Hotspot Timeout)
+    // 1. Networking: nmrs Wi-Fi Manager and Hotspot fallback
     tokio::spawn(async {
-        println!("Initializing Networking with nmrs...");
-        // Scan for known SSID connections on startup
-        println!("Scanning for known connections...");
-
-        let mut is_connected = false;
-        // Wait up to 30 seconds for an active connection
-        for i in 1..=30 {
-            sleep(Duration::from_secs(1)).await;
-            // In a real scenario, query `nmrs::NetworkManager::new().await?.state()` 
-            // For now, we simulate that no connection was established
-            if i % 10 == 0 {
-                println!("Waiting for active Wi-Fi connection... {}s", i);
-            }
+        if let Err(e) = wifi_manager::start_wifi_manager().await {
+            eprintln!("Wifi Manager Error: {}", e);
         }
-
-        if !is_connected {
-            println!("No connection active within 30 seconds.");
-            println!("Using nmrs to create Wi-Fi Hotspot 'VibeCast-Setup'...");
-            // nmrs hotspot creation logic goes here:
-            // let nm = nmrs::NetworkManager::new().await.unwrap();
-            // ... setup access point
-            is_connected = true; // Pretend we made the hotspot successfully
-        } else {
-            println!("Networking: Connected to known Wi-Fi network.");
-        }
-    });
-
-    // 1b. Axum Server for `/provision`
-    tokio::spawn(async {
-        let app = Router::new().route("/provision", post(handle_wifi_config));
-        let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
-        println!("Starting Axum Wi-Fi config server on {}", addr);
-        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        axum::serve(listener, app).await.unwrap();
     });
 
     // 2. Bluetooth: Auto-connect to last used speaker via bluer
@@ -117,20 +76,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Keep the daemon alive
     std::future::pending::<()>().await;
     Ok(())
-}
-
-async fn handle_wifi_config(Json(payload): Json<WifiConfig>) -> axum::http::StatusCode {
-    println!("Axum /provision hit! SSID: {}", payload.ssid);
-    println!("Disabling 'VibeCast-Setup' Hotspot using nmrs...");
-    println!("Connecting to new Wi-Fi network '{}' using nmrs...", payload.ssid);
-    
-    // Example nmrs usage logic:
-    // let nm = nmrs::NetworkManager::new().await.unwrap();
-    // let device = nm.get_device_by_iface("wlan0").await.unwrap();
-    // let cloned_pw = payload.password.clone();
-    // ... disable hotspot, create connection profile, activate it on device
-
-    axum::http::StatusCode::OK
 }
 
 /// Helper function to perform system updates using arch-toolkit
