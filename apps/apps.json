@@ -1,0 +1,14 @@
+{
+  "apps": [
+    {
+      "id": "vibecast_media",
+      "name": "Media Player",
+      "executable": "vibecast_media.wasm"
+    },
+    {
+      "id": "vibecast_settings",
+      "name": "Settings",
+      "executable": "vibecast_settings.wasm"
+    }
+  ]
+}

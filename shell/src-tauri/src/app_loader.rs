@@ -1,18 +1,33 @@
 use anyhow::Result;
 use core_proto::{AppMetadata, RemoteInput, VibeApp};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use wasmtime::{Engine, Instance, Linker, Module, Store};
 
+#[derive(Debug, Deserialize)]
+pub struct AppsManifest {
+    pub apps: Vec<AppDefinition>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AppDefinition {
+    pub id: String,
+    pub name: String,
+    pub executable: String,
+}
+
 /// Wraps a WebAssembly instance to implement the VibeApp trait from the Host side.
 pub struct WasmApp {
+    pub id: String,
+    pub name: String,
     instance: Instance,
     store: Arc<Mutex<Store<()>>>,
 }
 
 impl WasmApp {
-    pub fn new(engine: &Engine, path: impl AsRef<Path>) -> Result<Self> {
+    pub fn new(engine: &Engine, path: impl AsRef<Path>, id: String, name: String) -> Result<Self> {
         let mut store = Store::new(engine, ());
         let module = Module::from_file(engine, path)?;
         let linker = Linker::new(engine);
@@ -23,6 +38,8 @@ impl WasmApp {
         let instance = linker.instantiate(&mut store, &module)?;
 
         Ok(Self {
+            id,
+            name,
             instance,
             store: Arc::new(Mutex::new(store)),
         })
@@ -96,32 +113,41 @@ impl Registry {
         }
     }
 
-    /// Scans a directory for .wasm files and attempts to instantiate them
+    /// Scans a directory for apps.json and attempts to instantiate the listed apps
     pub fn scan_and_load(&mut self, apps_dir: impl AsRef<Path>) -> Result<()> {
         let dir = apps_dir.as_ref();
         if !dir.exists() {
             std::fs::create_dir_all(dir)?;
         }
 
-        for entry in std::fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
+        let manifest_path = dir.join("apps.json");
+        if !manifest_path.exists() {
+            eprintln!("Warning: apps.json not found in {:?}", dir);
+            return Ok(());
+        }
 
-            if path.extension().and_then(|s| s.to_str()) == Some("wasm") {
-                match WasmApp::new(&self.engine, &path) {
+        let manifest_content = std::fs::read_to_string(&manifest_path)?;
+        let manifest: AppsManifest = serde_json::from_str(&manifest_content)?;
+
+        for app_def in manifest.apps {
+            let wasm_path = dir.join(&app_def.executable);
+            if wasm_path.exists() {
+                match WasmApp::new(&self.engine, &wasm_path, app_def.id.clone(), app_def.name.clone()) {
                     Ok(app) => {
-                        let name = path
-                            .file_stem()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .to_string();
-                        println!("Successfully loaded WasmApp: {}", name);
-                        self.apps.insert(name, app);
+                        println!("Successfully loaded WasmApp: {}", app_def.name);
+                        self.apps.insert(app_def.id.clone(), app);
+                        
+                        // Default focus to the first loaded app if none active
+                        if self.active_app.is_none() {
+                            self.active_app = Some(app_def.id);
+                        }
                     }
                     Err(e) => {
-                        eprintln!("Failed to load WasmApp from {:?}: {}", path, e);
+                        eprintln!("Failed to load WasmApp from {:?}: {}", wasm_path, e);
                     }
                 }
+            } else {
+                eprintln!("Wasm file not found for app {}: {:?}", app_def.id, wasm_path);
             }
         }
         Ok(())
