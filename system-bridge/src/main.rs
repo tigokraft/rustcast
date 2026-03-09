@@ -1,7 +1,7 @@
 
 use axum::{routing::post, Json, Router};
-use bluer::Session;
 use serde::Deserialize;
+mod bluetooth_agent;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -87,8 +87,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 2. Bluetooth: Auto-connect to last used speaker via bluer
     tokio::spawn(async {
-        if let Err(e) = auto_pair_bluetooth().await {
-            eprintln!("Bluetooth Auto-pair Error: {}", e);
+        if let Err(e) = bluetooth_agent::start_bluetooth_agent().await {
+            eprintln!("Bluetooth Agent Error: {}", e);
         }
     });
 
@@ -152,35 +152,4 @@ async fn perform_system_update() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Helper function to auto-pair Bluetooth via bluer
-async fn auto_pair_bluetooth() -> Result<(), Box<dyn std::error::Error>> {
-    let session = Session::new().await?;
-    let adapter = session.default_adapter().await?;
-    adapter.set_powered(true).await?;
-    println!("Bluetooth adapter powered on. MAC: {}", adapter.name());
 
-    let device_addrs = adapter.device_addresses().await?;
-    // Just an example, connecting to the first known/paired device
-    // In reality, we'd query a local DB to find the "last used" Address
-    if let Some(&addr) = device_addrs.first() {
-        let device = adapter.device(addr)?;
-        if !device.is_connected().await? {
-            println!("Attempting to connect to Bluetooth device: {}", addr);
-            // Ignore error for now if it is out of range
-            let _ = device.connect().await;
-            println!("Connected to audio device!");
-        } else {
-            println!("Bluetooth device {} is already connected.", addr);
-        }
-    }
-    
-    // Auto-set audio sink to HDMI out (PipeWire wireplumber/wpctl)
-    // wpctl set-default N (where N is the HDMI node)
-    println!("Configuring PipeWire default sink to HDMI out...");
-    let _ = tokio::process::Command::new("wpctl")
-        .args(&["set-default", "50"]) // 50 is an example node ID
-        .output()
-        .await;
-
-    Ok(())
-}
