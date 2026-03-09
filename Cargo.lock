@@ -5441,11 +5441,13 @@ dependencies = [
  "arch-toolkit",
  "axum",
  "bluer",
+ "futures-util",
  "nmrs",
  "serde",
  "serde_json",
  "tokio",
  "tokio-cron-scheduler",
+ "tokio-stream",
  "zbus",
 ]
 
