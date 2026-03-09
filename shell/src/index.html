@@ -14,6 +14,30 @@
       <div class="loader">Loading VibeCast...</div>
     </main>
 
+    <!-- System Screens Overlay (Startup, Shutdown, Setup) -->
+    <div id="system-screen" class="hidden">
+      <!-- Startup -->
+      <div id="screen-startup" class="screen-content hidden">
+        <img src="/assets/logo.svg" alt="VibeCast Logo" class="pulse-anim" />
+        <h2>Starting up...</h2>
+      </div>
+
+      <!-- Shutdown -->
+      <div id="screen-shutdown" class="screen-content hidden">
+        <img src="/assets/power.svg" alt="Power Off Logo" class="icon" />
+        <h2>Shutting down...</h2>
+        <p>Please do not unplug the device.</p>
+      </div>
+
+      <!-- Setup Mode -->
+      <div id="screen-setup" class="screen-content hidden">
+        <img src="/assets/wifi.svg" alt="Wi-Fi Logo" class="icon bounce-anim" />
+        <h2>Setup Mode Active</h2>
+        <p>Connect your phone to <strong>VibeCast-Setup</strong></p>
+        <p class="small">Open the VibeCast Mobile App to provision your home internet.</p>
+      </div>
+    </div>
+
     <!-- Global Overlay for Toasts and System Messages, sitting on top of the UI -->
     <div id="global-overlay"></div>
   </body>
