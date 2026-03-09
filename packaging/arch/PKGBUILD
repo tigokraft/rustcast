@@ -1,0 +1,31 @@
+# Maintainer: Exxo <exxo@vibecast.local>
+pkgname=vibecast-system-bridge
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Privileged system daemon for managing Arch Linux networking, bluetooth, and updates for VibeCast"
+arch=('x86_64')
+url="https://github.com/tigokraft/rustcast"
+license=('MIT')
+depends=('pipewire' 'bluez' 'networkmanager' 'systemd')
+makedepends=('cargo' 'rust' 'pkgconf')
+source=("system-bridge-${pkgver}.tar.gz::https://github.com/tigokraft/rustcast/archive/refs/tags/v${pkgver}.tar.gz"
+        "system-bridge.service")
+sha256sums=('SKIP'
+            'SKIP')
+
+build() {
+  cd "rustcast-${pkgver}"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --release --locked -p system-bridge
+}
+
+package() {
+  cd "rustcast-${pkgver}"
+
+  # Install binary
+  install -Dm755 "target/release/system-bridge" "$pkgdir/usr/bin/system-bridge"
+
+  # Install systemd service
+  install -Dm644 "$srcdir/system-bridge.service" "$pkgdir/usr/lib/systemd/system/system-bridge.service"
+}
