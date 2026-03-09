@@ -3,6 +3,8 @@ const { listen } = window.__TAURI__.event;
 
 let appContainer;
 let globalOverlay;
+let systemScreenOverlay;
+let allSystemScreens;
 
 // Function to pop a global notification overlay
 export function showToast(message, durationMs = 3000) {
@@ -48,6 +50,32 @@ window.addEventListener("DOMContentLoaded", async () => {
     // Subscribe to system-toast events from the D-Bus backend wrapper
     listen('system-toast', (event) => {
         showToast(event.payload.message || event.payload);
+    });
+
+    systemScreenOverlay = document.getElementById("system-screen");
+    allSystemScreens = document.querySelectorAll(".screen-content");
+
+    // System Screens Logic
+    function showSystemScreen(screenId) {
+        if (!screenId) {
+            systemScreenOverlay.classList.add('hidden');
+            allSystemScreens.forEach(s => s.classList.add('hidden'));
+            return;
+        }
+        
+        systemScreenOverlay.classList.remove('hidden');
+        allSystemScreens.forEach(s => {
+            if (s.id === `screen-${screenId}`) {
+                s.classList.remove('hidden');
+            } else {
+                s.classList.add('hidden');
+            }
+        });
+    }
+
+    // Subscribe to system screen states (startup, shutdown, setup)
+    listen('system-screen-update', (event) => {
+        showSystemScreen(event.payload);
     });
 
     // Subscribe to dynamic hot-reloading theme configs
