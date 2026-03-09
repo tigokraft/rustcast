@@ -11,6 +11,7 @@ pub enum RemoteInput {
     PlayPause,
     VolumeUp,
     VolumeDown,
+    Search(String),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
