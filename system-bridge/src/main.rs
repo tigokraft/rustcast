@@ -76,9 +76,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // 1b. Axum Server for `/config/wifi`
+    // 1b. Axum Server for `/provision`
     tokio::spawn(async {
-        let app = Router::new().route("/config/wifi", post(handle_wifi_config));
+        let app = Router::new().route("/provision", post(handle_wifi_config));
         let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
         println!("Starting Axum Wi-Fi config server on {}", addr);
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
@@ -120,7 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn handle_wifi_config(Json(payload): Json<WifiConfig>) -> axum::http::StatusCode {
-    println!("Axum /config/wifi hit! SSID: {}", payload.ssid);
+    println!("Axum /provision hit! SSID: {}", payload.ssid);
     println!("Disabling 'VibeCast-Setup' Hotspot using nmrs...");
     println!("Connecting to new Wi-Fi network '{}' using nmrs...", payload.ssid);
     
