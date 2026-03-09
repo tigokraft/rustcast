@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = [
+    "core-proto",
+    "remote-server",
+    "shell/src-tauri",
+]
+
+[workspace.dependencies]
+core-proto = { path = "core-proto" }
