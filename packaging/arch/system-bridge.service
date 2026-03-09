@@ -1,7 +1,6 @@
 [Unit]
-Description=VibeCast System Bridge Daemon
-After=network-online.target
-Wants=network-online.target
+Description=VibeCast Autonomous System Bridge
+After=NetworkManager.service
 
 [Service]
 Type=simple
@@ -10,12 +9,11 @@ Restart=on-failure
 RestartSec=5
 
 # Privileged daemon for managing network, bluetooth, and system updates
-User=root
-Group=root
+User=vibecast
 
 # Hardening options (can be adjusted later if they break zbus/Arch Toolkit)
-NoNewPrivileges=false
-ProtectSystem=full
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
 
 [Install]
 WantedBy=multi-user.target
