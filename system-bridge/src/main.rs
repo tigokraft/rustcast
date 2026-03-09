@@ -27,13 +27,40 @@ impl VibeSystemBridge {
         Ok("Scanning for devices...".to_string())
     }
 
-    /// Triggers a system update manually
-    async fn trigger_update(&self) -> zbus::fdo::Result<String> {
-        println!("IPC Request: Manual System Update");
+    /// Triggers a system update manually (Check only)
+    async fn check_updates(&self) -> zbus::fdo::Result<String> {
+        println!("IPC Request: Check System Updates");
         tokio::spawn(async {
-            let _ = perform_system_update().await;
+            let _ = perform_system_update(true).await;
         });
-        Ok("System update started in background".to_string())
+        Ok("Checking for updates in background...".to_string())
+    }
+
+    /// Triggers a system update manually (Apply)
+    async fn apply_updates(&self) -> zbus::fdo::Result<String> {
+        println!("IPC Request: Apply System Updates");
+        tokio::spawn(async {
+            let _ = perform_system_update(false).await;
+        });
+        Ok("Applying system updates in background...".to_string())
+    }
+
+    /// Suspends the system using logind
+    async fn suspend(&self) -> zbus::fdo::Result<String> {
+        println!("IPC Request: Suspend System");
+        tokio::spawn(async {
+            let _ = tokio::process::Command::new("systemctl").arg("suspend").output().await;
+        });
+        Ok("System is suspending...".to_string())
+    }
+
+    /// Powers off the system using logind
+    async fn power_off(&self) -> zbus::fdo::Result<String> {
+        println!("IPC Request: Power Off System");
+        tokio::spawn(async {
+            let _ = tokio::process::Command::new("systemctl").arg("poweroff").output().await;
+        });
+        Ok("System is powering off...".to_string())
     }
 }
 
@@ -80,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add(Job::new_async("0 0 3 * * Sun", |_uuid, _l| {
             Box::pin(async move {
                 println!("Scheduled Task: Running Arch Maintenance Update...");
-                let _ = perform_system_update().await;
+                let _ = perform_system_update(false).await;
             })
         })?)
         .await?;
@@ -101,21 +128,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Helper function to perform system updates using arch-toolkit
-async fn perform_system_update() -> Result<(), Box<dyn std::error::Error>> {
-    // Note: To truly auto-update we would wrap this in a Command running pacman.
-    // The arch-toolkit crate provides various helper functions.
-    // E.g. pacman::sync(vec!["--noconfirm", "--sysupgrade", "--refresh"]);
-    println!("Running pacman -Syu --noconfirm...");
-    let status = tokio::process::Command::new("pacman")
-        .args(["-Syu", "--noconfirm"])
-        .status()
-        .await?;
-
-    if status.success() {
-        println!("System Update completed successfully.");
+/// Helper function to perform system updates using arch-toolkit or pacman directly
+async fn perform_system_update(check_only: bool) -> Result<(), Box<dyn std::error::Error>> {
+    if check_only {
+        println!("Running pacman -Sy to check for updates...");
+        let status = tokio::process::Command::new("pacman")
+            .args(["-Sy"])
+            .status()
+            .await?;
+        
+        if status.success() {
+            println!("System Update Check completed successfully.");
+        } else {
+            eprintln!("System Update Check failed.");
+        }
     } else {
-        eprintln!("System Update failed.");
+        println!("Running pacman -Syu --noconfirm...");
+        let status = tokio::process::Command::new("pacman")
+            .args(["-Syu", "--noconfirm"])
+            .status()
+            .await?;
+
+        if status.success() {
+            println!("System Update completed successfully.");
+        } else {
+            eprintln!("System Update failed.");
+        }
     }
     Ok(())
 }

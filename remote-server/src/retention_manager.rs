@@ -1,6 +1,6 @@
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use std::time::Duration;
-use sysinfo::{DiskExt, System, SystemExt};
+use sysinfo::Disks;
 use tokio::time;
 
 pub struct RetentionManager {
@@ -60,18 +60,23 @@ impl RetentionManager {
         let cutoff_date = format!("-{} days", self.max_age_days);
         
         // Find paths to delete from disk (in a real app, we'd fs::remove_file these)
-        let records = sqlx::query!(
-            "SELECT id, file_path FROM media WHERE added_at < datetime('now', ?)",
-            cutoff_date
-        )
-        .fetch_all(&self.db)
-        .await?;
+        let mut query_builder = String::from("SELECT id, file_path FROM media WHERE added_at < datetime('now', '");
+        query_builder.push_str(&cutoff_date);
+        query_builder.push_str("')");
+
+        let records = sqlx::query(&query_builder)
+            .fetch_all(&self.db)
+            .await?;
 
         for record in records {
-            println!("Pruning expired media: {}", record.file_path);
-            let _ = std::fs::remove_file(&record.file_path);
+            let record_id: i64 = sqlx::Row::try_get(&record, "id").unwrap_or(0);
+            let file_path: String = sqlx::Row::try_get(&record, "file_path").unwrap_or_default();
             
-            sqlx::query!("DELETE FROM media WHERE id = ?", record.id)
+            println!("Pruning expired media: {}", file_path);
+            let _ = std::fs::remove_file(&file_path);
+            
+            sqlx::query("DELETE FROM media WHERE id = ?")
+                .bind(record_id)
                 .execute(&self.db)
                 .await?;
         }
@@ -81,12 +86,15 @@ impl RetentionManager {
 
     /// Deletes the oldest entries until disk utilization is under 70% if it was > 90%
     async fn enforce_disk_limits(&self) -> std::result::Result<(), sqlx::Error> {
-        let mut sys = System::new_all();
-        sys.refresh_disks_list();
-        sys.refresh_disks();
+        let disks = Disks::new_with_refreshed_list();
 
-        // Get the disk we likely care about (in this demo, the first root/storage disk)
-        if let Some(disk) = sys.disks().first() {
+        // Find the disk containing /home/exxo/downloads or fallback to root /
+        let target_path = std::path::Path::new("/home/exxo/downloads");
+        let target_disk = disks.iter().find(|d| {
+            d.mount_point() == target_path || d.mount_point() == std::path::Path::new("/home") || d.mount_point() == std::path::Path::new("/")
+        });
+
+        if let Some(disk) = target_disk.or_else(|| disks.first()) {
             let total_space = disk.total_space() as f64;
             let available_space = disk.available_space() as f64;
             let used_space = total_space - available_space;
@@ -101,18 +109,22 @@ impl RetentionManager {
                 // Delete oldest entries until we've freed enough space
                 while freed_bytes < bytes_to_free {
                     // Get the single oldest entry
-                    let oldest = sqlx::query!("SELECT id, file_path FROM media ORDER BY added_at ASC LIMIT 1")
+                    let oldest = sqlx::query("SELECT id, file_path FROM media ORDER BY added_at ASC LIMIT 1")
                         .fetch_optional(&self.db)
                         .await?;
 
                     if let Some(record) = oldest {
-                        if let Ok(metadata) = std::fs::metadata(&record.file_path) {
+                        let record_id: i64 = sqlx::Row::try_get(&record, "id").unwrap_or(0);
+                        let file_path: String = sqlx::Row::try_get(&record, "file_path").unwrap_or_default();
+
+                        if let Ok(metadata) = std::fs::metadata(&file_path) {
                             freed_bytes += metadata.len();
                         }
-                        println!("Disk pressure prune: {}", record.file_path);
-                        let _ = std::fs::remove_file(&record.file_path);
+                        println!("Disk pressure prune: {}", file_path);
+                        let _ = std::fs::remove_file(&file_path);
 
-                        sqlx::query!("DELETE FROM media WHERE id = ?", record.id)
+                        sqlx::query("DELETE FROM media WHERE id = ?")
+                            .bind(record_id)
                             .execute(&self.db)
                             .await?;
                     } else {

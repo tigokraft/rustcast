@@ -12,8 +12,8 @@ RestartSec=5
 User=vibecast
 
 # Hardening options (can be adjusted later if they break zbus/Arch Toolkit)
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_TIME
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_TIME
 
 [Install]
 WantedBy=multi-user.target

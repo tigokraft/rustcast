@@ -20,7 +20,13 @@ if ! id "vibecast" &>/dev/null; then
     sudo useradd -m -s /bin/bash vibecast
 fi
 
-# 4. Enable System Services
+# 4. Configure D-Bus permissions for the 'vibecast' user
+echo "Configuring D-Bus system policies for system-bridge..."
+sudo cp packaging/arch/com.vibecast.SystemBridge.conf /etc/dbus-1/system.d/
+# Reload D-Bus to ingest new policy
+sudo systemctl reload dbus
+
+# 5. Enable System Services
 echo "Enabling and starting NetworkManager, Bluetooth, and VibeCast services..."
 sudo systemctl enable --now NetworkManager
 sudo systemctl enable --now bluetooth
