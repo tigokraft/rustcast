@@ -5,6 +5,7 @@ members = [
     "remote-server",
     "shell/src-tauri",
     "system-bridge",
+    "mobile-remote/src-tauri",
 ]
 
 [workspace.dependencies]
