@@ -14,4 +14,4 @@ VibeCast Architecture
 
     Navigation: Standardized Trait-based focus system.
 
-When modifying, adding or removing anything, brief commits should be done to git for every little thing done.
+When modifying, adding or removing anything, brief commits should be done to git for every file and or section edited.
