@@ -2,38 +2,47 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>VibeCast Remote</title>
     <link rel="stylesheet" href="styles.css" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
     <script type="module" src="/main.js" defer></script>
   </head>
-
   <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
+    <header>
+      <h1>VibeCast Remote</h1>
+      <div id="connection-status" class="status-disconnected">Scanning for TV...</div>
+    </header>
 
-      <div class="row">
-        <a href="https://tauri.app" target="_blank">
-          <img src="/assets/tauri.svg" class="logo tauri" alt="Tauri logo" />
-        </a>
-        <a
-          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript"
-          target="_blank"
-        >
-          <img
-            src="/assets/javascript.svg"
-            class="logo vanilla"
-            alt="JavaScript logo"
-          />
-        </a>
+    <nav class="tabs">
+      <button id="tab-dpad" class="tab-btn active">Remote</button>
+      <button id="tab-search" class="tab-btn">Search</button>
+    </nav>
+
+    <!-- DPAD View -->
+    <main id="view-dpad" class="view active">
+      <div class="dpad-container">
+        <button class="dpad-btn up" data-action="Up">▲</button>
+        <button class="dpad-btn left" data-action="Left">◀</button>
+        <button class="dpad-btn ok" data-action="Select">OK</button>
+        <button class="dpad-btn right" data-action="Right">▶</button>
+        <button class="dpad-btn down" data-action="Down">▼</button>
       </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
+      <div class="media-controls">
+        <button class="control-btn" data-action="Back">Back</button>
+        <button class="control-btn" data-action="PlayPause">⏯</button>
+      </div>
+      <div class="media-controls">
+        <button class="control-btn" data-action="VolumeDown">Vol -</button>
+        <button class="control-btn" data-action="VolumeUp">Vol +</button>
+      </div>
+    </main>
 
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
+    <!-- SEARCH View -->
+    <main id="view-search" class="view">
+      <div class="search-container">
+        <input type="text" id="search-input" placeholder="Type on TV..." />
+        <p class="search-hint">Characters are sent instantly to the TV.</p>
+      </div>
     </main>
   </body>
 </html>
