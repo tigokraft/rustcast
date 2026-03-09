@@ -4,6 +4,7 @@ members = [
     "core-proto",
     "remote-server",
     "shell/src-tauri",
+    "system-bridge",
 ]
 
 [workspace.dependencies]
